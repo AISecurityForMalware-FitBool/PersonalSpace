@@ -1,0 +1,98 @@
+import json
+import csv
+import os
+
+# 변환할 피처 순서 (총 109개)
+FEATURES = [
+    'pa_pe_section_noname_flag', 'pa_pe_apicount_synchronization', 'pa_pe_apicount_dataexchange',
+    'pa_pe_apicount_file', 'pa_pe_apicount_reckoning', 'pa_pe_apicount_memory', 'pa_pe_apicount_execution',
+    'pa_pe_apicount_console', 'pa_pe_apicount_diagnostic', 'pa_pe_apicount_dynamiclibrary',
+    'pa_pe_apicount_storage', 'pa_pe_apicount_resource', 'pa_pe_apicount_windowing',
+    'pa_pe_apicount_network', 'pa_pe_apicount_security', 'pa_pe_apicount_registry',
+    'pa_pe_apicount_services', 'pa_pe_apicount_rdp', 'pa_pe_apicount_cryptography',
+    'md5', 'sha1', 'sha256', 'file_name', 'file_type', 'mime_type', 'file_size',
+    'av_detection_a', 'av_detection_b', 'av_detection_c', 'av_detection_d',
+    'pe_header_fileinfo_item_number', 'pe_header_timestamp', 'pe_header_api_import_number',
+    'pe_header_sectionsize_text', 'entropy_section_text', 'pe_header_sectionsize_data',
+    'entropy_section_data', 'pe_header_sectionsize_bss', 'entropy_section_rdata',
+    'entropy_section_reloc', 'entropy_section_rsrc', 'pe_header_section_md5',
+    'pe_header_sectionsize_second', 'pa_pe_section_notregular', 'pa_pe_section_regular',
+    'pe_header_flag_debug', 'pe_header_resource_languagecount_ENGLISH US',
+    'pe_header_resource_languagecount_NEUTRAL', 'pe_resourcecount_cursor',
+    'pa_pe_binarycontained', 'pe_resourcecount_icon', 'pe_resourcecount_rcdata',
+    'pe_resourcecount_string', 'pe_resourcecount_group_cursor', 'pe_resourcecount_group_icon',
+    'pe_header_size', 'pe_header_sectionsize_export', 'pe_header_sectionsize_import',
+    'pe_header_sectionsize_resource', 'pe_header_section_number', 'pe_header_baseofdata',
+    'pe_header_checksum', 'pe_header_dll_importnumber', 'pe_header_emaxalloc',
+    'pe_header_ecblp', 'pe_header_ecp', 'pe_header_ecparhdr', 'pe_header_elfanew',
+    'pe_header_esp', 'pe_header_entrypoint', 'pe_header_filealignment',
+    'pe_header_iat_rva', 'pe_header_fileversion', 'pe_header_flag_cfg',
+    'pe_header_flag_dep', 'pe_header_flag_image_dll_characteristics_appcontainer',
+    'pe_header_flag_image_dll_characteristics_high_entropy_va',
+    'pe_header_flag_image_dllcharacteristics_dynamic_base',
+    'pe_header_flag_image_dllcharacteristics_force_integrity',
+    'pe_header_flag_image_dllcharacteristics_no_bind',
+    'pe_header_flag_image_dllcharacteristics_no_isolation',
+    'pe_header_flag_image_dllcharacteristics_no_seh',
+    'pe_header_flag_image_dllcharacteristics_terminal_server_aware',
+    'pe_header_flag_image_dllcharacteristics_wdm_driver',
+    'pe_header_flag_image_file_32bit_machine',
+    'pe_header_flag_image_file_debug_stripped',
+    'pe_header_flag_image_file_dll',
+    'pe_header_flag_image_file_executable_image',
+    'pe_header_flag_image_file_large_address_aware',
+    'pe_header_flag_image_file_line_nums_stripped',
+    'pe_header_flag_image_file_local_syms_stripped',
+    'pe_header_flag_image_file_net_run_from_swap',
+    'pe_header_flag_image_file_relocs_stripped',
+    'pe_header_flag_image_file_removable_run_from_swap',
+    'pe_header_flag_image_file_system',
+    'pe_header_flag_image_file_up_system_only',
+    'pe_header_loaderflags', 'pe_header_majorOSversion', 'pe_header_minorOSversion',
+    'pe_header_reloc_item_number', 'pe_header_data_item_number',
+    'pe_header_sectionalignment', 'pe_header_sizeofheaders',
+    'pe_header_sizeofheapcommit', 'pe_header_sizeofheapreserve',
+    'pe_header_sizeofimage', 'pe_header_sizeofstackcommit',
+    'pe_header_sizeofstackreserve', 'label'
+]
+
+def json_to_row(data):
+    """ JSON 객체 하나를 지정된 FEATURES 순서대로 평탄화 """
+    flat_data = {}
+    for feature in FEATURES:
+        if feature == "label":
+            flat_data[feature] = "virus"  # label 고정
+        elif feature.startswith("av_detection_"):
+            key = feature.split("_")[-1]
+            flat_data[feature] = data.get("av_detection", {}).get(key, "")
+        elif feature.startswith("pe_header_resource_languagecount_"):
+            lang = feature.split("_")[-1]
+            flat_data[feature] = data.get("pe_header_resource_languagecount", {}).get(lang, "")
+        else:
+            flat_data[feature] = data.get(feature, "")
+    return flat_data
+
+def folder_json_to_csv(input_folder, output_csv):
+    """ 폴더 안의 모든 JSON 파일을 순회해서 CSV로 변환 """
+    rows = []
+    for filename in os.listdir(input_folder):
+        if filename.endswith(".json"):
+            json_path = os.path.join(input_folder, filename)
+            with open(json_path, "r", encoding="utf-8") as f:
+                try:
+                    data = json.load(f)
+                    rows.append(json_to_row(data))
+                except Exception as e:
+                    print(f"❌ {filename} 변환 실패: {e}")
+
+    # CSV 저장
+    with open(output_csv, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=FEATURES)
+        writer.writeheader()
+        writer.writerows(rows)
+
+# 실행 예시
+folder_json_to_csv(
+    input_folder="/Users/eden/Downloads/drive-download-20250901T235754Z-1-001/exe.virus_1",   # JSON들이 들어있는 폴더 경로
+    output_csv="/Users/eden/Desktop/fitBool_eden/mal10ben40/jsonBen/virus.csv"
+)
