@@ -1,4 +1,5 @@
 ## 디렉토리 구조
+```text
 static/
 ├─ artifacts/                # 모델과 피처 관련 산출물
 │  ├─ feature_list.txt       # 최종 피처 목록
@@ -10,7 +11,7 @@ static/
 │
 └─ rules/
    └─ packer.yar             # 야라 룰 파일 
-   
+```
 ## 실행 방법
 ```bash
 python3 -m venv .venv
