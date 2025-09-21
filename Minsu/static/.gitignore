@@ -1,0 +1,52 @@
+# === Python 기본 ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+*.log
+
+# === Jupyter/Colab 산출물 ===
+.ipynb_checkpoints/
+*.ipynb
+*.ipynb.json
+
+# === 가상환경/패키지 ===
+.venv/
+venv/
+env/
+ENV/
+*.env
+*.toml.lock
+
+# === 빌드/배포 산출물 ===
+dist/
+build/
+*.whl
+
+# === 데이터/모델 산출물 ===
+*.pkl
+*.joblib
+*.parquet
+*.csv
+*.tsv
+*.zip
+*.gz
+*.tar
+*.tar.gz
+
+# artifacts 디렉토리 내 결과물은 제외 (원한다면 whitelist로 feature_list.txt만 허용)
+static/artifacts/*
+# !static/artifacts/feature_list.txt
+
+# === IDE/편집기 ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === 시스템 파일 ===
+.DS_Store
+Thumbs.db
