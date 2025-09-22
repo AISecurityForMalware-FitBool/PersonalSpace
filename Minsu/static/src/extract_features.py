@@ -14,7 +14,6 @@ import pefile
 import lief
 import yara
 
-# 0) 스키마 (학습 CSV 기준) + YARA 룰
 #    총 39개 피처 (순서 고정)
 FEATURE_COLUMNS = [
     "DllCharacteristics","MajorImageVersion","MajorOperatingSystemVersion",
@@ -41,7 +40,7 @@ def compile_yara(path: str):
     return yara.compile(filepaths={"ns0": os.path.abspath(path)}, includes=True)
 
 def get_yara_rules(path: Optional[str] = None):
-    """룰 전역 캐시. path가 없으면 env → 기본 경로 순으로 사용."""
+    """룰 전역 캐시 -> path가 없으면 env → 기본 경로 순으로 사용."""
     global _RULES
     if _RULES is None:
         rule_path = path or os.environ.get("YARA_RULE_PATH") or YARA_DEFAULT
@@ -55,7 +54,7 @@ def scan_packer_yara(raw_bytes: bytes, rules) -> Dict[str, int]:
         "yara_has_upx_like": 0, "yara_has_mpress_like": 0, "yara_has_aspack_like": 0,
     }
     try:
-        matches = rules.match(data=raw_bytes, timeout=10)  # timeout 방어
+        matches = rules.match(data=raw_bytes, timeout=10)
         if not matches:
             return out
 
@@ -75,7 +74,6 @@ def scan_packer_yara(raw_bytes: bytes, rules) -> Dict[str, int]:
         out["yara_has_upx_like"]    = 1 if "upx" in token_string    else 0
         out["yara_has_aspack_like"] = 1 if "aspack" in token_string else 0
 
-        # 'mpress'는 토큰 또는 정규식(단어 경계)로 탐지
         mpress_re = re.compile(r'(?<![A-Za-z0-9])mpress(?![A-Za-z0-9])', re.I)
         has_mpress = ("mpress" in token_string) or any(mpress_re.search(n) for n in rule_names)
         out["yara_has_mpress_like"] = 1 if has_mpress else 0
@@ -108,11 +106,11 @@ def _ensure_schema(row: Dict[str, float]) -> pd.DataFrame:
     cleaned = {k: row.get(k, DEFAULTS[k]) for k in FEATURE_COLUMNS}
     return pd.DataFrame([cleaned], columns=FEATURE_COLUMNS)
 
-# 3) 핵심: 바이트에서 피처 추출
+# 3) 피처 추출 함수 
 def extract_features_from_bytes(file_bytes: bytes, yara_rules_path: Optional[str] = None) -> pd.DataFrame:
     feats: Dict[str, float] = {}
 
-    # 3.1) PE 헤더 (pefile)
+    # 3.1) PE 헤더
     pe = None
     try:
         pe = pefile.PE(data=file_bytes, fast_load=True)
@@ -164,7 +162,7 @@ def extract_features_from_bytes(file_bytes: bytes, yara_rules_path: Optional[str
             try: pe.close()
             except Exception: pass
 
-    # 3.2) Imports (LIEF 우선, pefile fallback)
+    # 3.2) Imports
     all_imports, dlls, imports_per_dll = [], set(), []
     try:
         lb = lief.PE.parse(file_bytes)
@@ -217,12 +215,12 @@ def extract_features_from_bytes(file_bytes: bytes, yara_rules_path: Optional[str
     base64_blobs = re.findall(b'[A-Za-z0-9+/=]{20,}', file_bytes)
     feats["strings_base64_blob_count"] = len(base64_blobs)
 
-    # 3.4) YARA (패커 계열)
+    # 3.4) YARA 패커 탐지
     try:
-        rules = get_yara_rules(yara_rules_path)  # None이면 자동 기본 경로 사용
+        rules = get_yara_rules(yara_rules_path) 
         feats.update(scan_packer_yara(file_bytes, rules))
     except FileNotFoundError:
-        # 룰 파일이 없으면 안전하게 0으로 채움
+        # 혹시나 룰 파일이 없으면 0으로 채움
         feats.update({
             "yara_has_packer_generic": 0,
             "yara_count_packer": 0,
@@ -231,17 +229,16 @@ def extract_features_from_bytes(file_bytes: bytes, yara_rules_path: Optional[str
             "yara_has_aspack_like": 0,
     })
 
-    # 3.5) 최종 스키마 적용
     return _ensure_schema(feats)
 
-# 4) 파일 경로 입력용 (편의 함수)
+# 4) 파일 경로 입력용
 def extract_features_from_path(file_path: str, yara_rules_path: Optional[str] = None) -> pd.DataFrame:
     """파일 경로 → 1×N DataFrame (FEATURE_COLUMNS 순서)."""
     with open(file_path, "rb") as f:
         data = f.read()
     return extract_features_from_bytes(data, yara_rules_path)
 
-# 5) (선택) API 경계용: DF → dict
+# 5) DF → dict
 def df_to_dict(df: pd.DataFrame) -> Dict[str, float]:
     """1×N DataFrame → dict (JSON 직렬화용)."""
     assert df.shape[0] == 1, "df must be a single-row DataFrame"
