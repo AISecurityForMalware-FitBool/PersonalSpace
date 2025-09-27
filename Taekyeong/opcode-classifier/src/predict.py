@@ -1,113 +1,164 @@
-# predict.py
+#predict.py 
 
 import joblib
 import re
 import sys
+import json
+import hashlib
 
-# --- 1. 학습 때 사용했던 모든 설정과 함수를 그대로 가져옵니다 ---
+# --- 1. 설정 및 함수 ---
 
-# 1-1. Opcode 화이트리스트
 OPCODE_WHITELIST = {
-    'mov', 'lea', 'push', 'pop', 'pusha', 'popa', 'xchg', 'movzx', 'movsx',
-    'add', 'sub', 'inc', 'dec', 'mul', 'imul', 'div', 'idiv', 'neg', 'sbb', 'adc',
-    'and', 'or', 'xor', 'not', 'shl', 'shr', 'sar', 'rol', 'ror',
-    'jmp', 'call', 'retn', 'ret', 'leave', 'enter',
-    'je', 'jz', 'jne', 'jnz', 'jg', 'jnle', 'jge', 'jnl', 'jl', 'jnge', 'jle', 'jng',
-    'ja', 'jae', 'jb', 'jbe', 'jc', 'jnc', 'jo', 'jno', 'jp', 'jpe', 'jnp', 'jpo',
-    'js', 'jns',
-    'cmp', 'test', 'setz', 'setnz', 'seta', 'setae', 'setb', 'setbe',
-    'rep', 'repe', 'repne', 'movsb', 'movsd', 'stosb', 'stosd', 'cmpsb', 'scasb',
+    'mov', 'lea', 'push', 'pop', 'pusha', 'popa', 'xchg', 'movzx', 'movsx', 'add', 
+    'sub', 'inc', 'dec', 'mul', 'imul', 'div', 'idiv', 'neg', 'sbb', 'adc', 'and', 
+    'or', 'xor', 'not', 'shl', 'shr', 'sar', 'rol', 'ror', 'jmp', 'call', 'retn', 
+    'ret', 'leave', 'enter', 'je', 'jz', 'jne', 'jnz', 'jg', 'jnle', 'jge', 'jnl', 
+    'jl', 'jnge', 'jle', 'jng', 'ja', 'jae', 'jb', 'jbe', 'jc', 'jnc', 'jo', 'jno', 
+    'jp', 'jpe', 'jnp', 'jpo', 'js', 'jns', 'cmp', 'test', 'setz', 'setnz', 'seta', 
+    'setae', 'setb', 'setbe', 'rep', 'repe', 'repne', 'movsb', 'movsd', 'stosb', 
+    'stosd', 'cmpsb', 'scasb',
 }
 
-# 1-2. Opcode 추출 함수
+
+# 형식: 'push mov add' 처럼 Opcode 3개를 공백으로 연결한 문자열
+TARGET_TRIGRAMS_TO_TRACK = [
+    # --- 공통 피처 (20개) ---
+    'mov mov cmp', 'mov lea mov', 'mov mov call', 'mov jmp mov', 
+    'mov mov add', 'mov mov mov', 'test jz mov', 'mov mov lea', 
+    'jz mov mov', 'mov mov test', 'mov call mov', 'cmp jnz mov', 
+    'jmp mov mov', 'call mov mov', 'push push push', 'pop pop pop', 
+    'mov test jz', 'lea mov call', 'lea call mov', 'lea mov mov',
+    
+    # --- 악성 특화 피처 (14개, "retn sub sub" 제외) ---
+    'mov push call', 'mov imul mov', 'mov push mov', 'push call add', 
+    'push push call', 'mov mov push', 'push push mov', 'imul mov mov', 
+    'mov push push', 'mov mov imul', 'mov mul mov', 'push mov push', 
+    'push mov call', 'push call mov',
+    
+    # --- 정상 특화 피처 (13개, "pop ret mov"와 "pop pop ret" 제외) ---
+    'jnz mov mov', 'mov add pop', 'push sub mov', 'mov cmp jz', 
+    'call test jz', 'call mov test', 'cmp jz mov', 'sub mov mov', 
+    'lea mov lea', 'mov call test', 'xor mov mov', 'mov xor mov', 
+    'mov lea call',
+]
+
 def extract_opcodes_from_asm(filepath):
-    """ .asm 파일에서 화이트리스트에 있는 Opcode만 추출합니다. (업그레이드 버전) """
-    
-    # ★★★★★ 수정된 정규식 ★★★★★
-    # 새로운 형식을 처리하기 위해, 주소 뒤에 오는 Hex 코드를 건너뛰고 Opcode만 정확히 추출하도록 수정
+    """ .asm 파일에서 화이트리스트에 있는 Opcode만 추출 """
     opcode_pattern = re.compile(r'^\s*[0-9a-fA-F]+:\s+(?:[0-9a-fA-F]{2,}\s+)*([a-zA-Z]{2,})')
-    
     filtered_opcodes = []
     try:
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
             for line in f:
                 match = opcode_pattern.search(line)
                 if match:
-                    # 정규식의 첫 번째 그룹이 바로 Opcode가 됩니다.
                     opcode = match.group(1).lower()
                     if opcode in OPCODE_WHITELIST:
                         filtered_opcodes.append(opcode)
-    except Exception as e:
-        print(f"파일 처리 중 오류 발생: {e}")
+    except Exception:
+        return []
     return filtered_opcodes
 
+def get_file_hashes(filepath):
+    """파일의 MD5, SHA256 해시를 계산"""
+    BUF_SIZE = 65536
+    md5, sha256 = hashlib.md5(), hashlib.sha256()
+    try:
+        with open(filepath, 'rb') as f:
+            while True:
+                data = f.read(BUF_SIZE)
+                if not data: break
+                md5.update(data); sha256.update(data)
+        return {"md5": md5.hexdigest(), "sha256": sha256.hexdigest()}
+    except FileNotFoundError:
+        return {"md5": None, "sha256": None}
 
-# --- 2. 예측을 수행하는 메인 함수 ---
+# --- 2. 메인 예측 함수 ---
 
 def predict_asm_file(filepath):
-    """
-    하나의 .asm 파일을 입력받아 악성 여부를 예측합니다.
-    근거가 불충분할 경우 '판단 불가'로 처리합니다.
-    """
-    # 1. 저장된 모델 파이프라인 로드 (기존과 동일)
+    """하나의 .asm 파일을 입력받아 악성 여부를 JSON 형태로 출력"""
+    result = {
+        "file": filepath,
+        "hashes": get_file_hashes(filepath),
+        "prediction": {},
+        "features": {}
+    }
+
     try:
         model_pipeline = joblib.load('malware_detection_model.joblib')
-        vectorizer = model_pipeline['vectorizer']
-        model = model_pipeline['model']
+        vectorizer = model_pipeline['vectorizer']   # TF-IDF 변환기
+        model = model_pipeline['model']             # 머신러닝 모델
     except FileNotFoundError:
-        print("오류: 'malware_detection_model.joblib' 파일을 찾을 수 없습니다.")
+        result["error"] = "Model file 'malware_detection_model.joblib' not found."
+        print(json.dumps(result, indent=2))
         return
 
-    print(f"📄 파일 분석 시작: {filepath}")
-
-    # 2. Opcode 추출 및 Trigram 생성 (기존과 동일)
+    # 1. 파일에서 Opcode 리스트를 추출
     opcodes = extract_opcodes_from_asm(filepath)
-    if not opcodes:
-        print("분석할 유효한 Opcode를 찾을 수 없습니다.")
+    result["features"]["opcode_count"] = len(opcodes)
+
+    # Opcode가 3개 미만이면 Trigram을 만들 수 없으므로 '판단 불가' 처리
+    if len(opcodes) < 3:
+        result["prediction"] = {"label": "Indeterminate", "reason": "Not enough opcodes."}
+        print(json.dumps(result, indent=2))
         return
-    
+
+    # 2. Opcode 리스트를 3개씩 묶어 Trigram 리스트를 생성
     trigrams = [' '.join(opcodes[i:i+3]) for i in range(len(opcodes) - 2)]
     trigram_corpus = ' '.join(trigrams)
+    result["features"]["trigram_count"] = len(trigrams)
 
-    # 3. TF-IDF 변환 (기존과 동일)
+    # 3. Trigram 문자열을 TF-IDF 벡터(숫자 벡터)로 변환
     tfidf_vector = vectorizer.transform([trigram_corpus])
 
+    # 4. 사용자가 지정한 47개 핵심 Trigram의 TF-IDF 점수를 추출
+    all_model_features = vectorizer.get_feature_names_out()
+    feature_to_index_map = {feature: idx for idx, feature in enumerate(all_model_features)}
+    target_trigram_scores = {}
 
-    # ★★★★★ 새로 추가된 핵심 로직 ★★★★★
-    # 4. 근거(Evidence) 확인
-    # TF-IDF 벡터에서 0이 아닌 값의 개수(non-zero count)를 확인합니다.
+    for trigram in TARGET_TRIGRAMS_TO_TRACK:
+        if trigram in feature_to_index_map:
+            index = feature_to_index_map[trigram]
+            score = float(tfidf_vector[0, index]) # numpy.float32 -> python float 변환
+            target_trigram_scores[trigram] = round(score, 6)
+        else:
+            target_trigram_scores[trigram] = 0.0
+            
+    result["features"]["target_trigrams"] = target_trigram_scores
+
+    # 5. 모델이 인식한 유효한 단서(Trigram)의 개수를 계산
     evidence_count = tfidf_vector.nnz
+    result["features"]["evidence_count"] = int(evidence_count)
 
-    print("--- 🔬 분석 결과 ---")
-
-    # 만약 유효한 피처가 하나도 없다면 (근거가 0이라면)
+    # 유효한 단서가 하나도 없으면 '판단 불가' 처리 (패킹/난독화 의심)
     if evidence_count == 0:
-        print("⚠️  예측: 판단 불가 (Indeterminate)")
-        print("   (이유: 모델이 학습한 유효한 Opcode 패턴을 발견하지 못했습니다.)")
-        print("   (권장: 패킹(Packed) 또는 난독화(Obfuscated)된 파일일 가능성이 높습니다.)")
-        return # 여기서 함수를 종료하여 더 이상 예측을 진행하지 않음
-    # ★★★★★ 로직 끝 ★★★★★
+        result["prediction"] = {"label": "Indeterminate", "reason": "No known patterns found."}
+        print(json.dumps(result, indent=2))
+        return
 
-
-    # 5. 모델 예측 (근거가 충분할 경우에만 실행됨)
+     # 6. 모델을 사용하여 악성(1)인지 정상(0)인지 예측
     prediction = model.predict(tfidf_vector)
     prediction_proba = model.predict_proba(tfidf_vector)
+    label = int(prediction[0])
+    prob = float(prediction_proba[0][1]) # 악성일 확률
 
-    # 6. 결과 출력 (기존과 동일)
-    if prediction[0] == 1:
-        print(f"🚨 예측: 악성코드 (Malware)")
-        print(f"   (신뢰도: {prediction_proba[0][1]:.2%})")
-    else:
-        print(f"🛡️ 예측: 정상 파일 (Benign)")
-        print(f"   (신뢰도: {prediction_proba[0][0]:.2%})")
-
+    # 7. 최종 예측 결과를 result 딕셔너리에 저장
+    result["prediction"] = {
+        "label": label,
+        "prob": prob,
+        "prob_percent": f"{prob:.2%}"
+    }
+    
+    # 8. 모든 정보가 담긴 result 딕셔너리를 보기 좋은 JSON 형태로 출력
+    print(json.dumps(result, indent=2, ensure_ascii=False))
 
 # --- 3. 스크립트 실행 부분 ---
-
+# 이 스크립트 파일이 직접 실행될 때만 아래 코드가 동작.
 if __name__ == '__main__':
-    # 터미널에서 파일 경로를 인자로 받습니다.
+    # 터미널에서 준 인자가 2개가 아니면 (python, 파일경로) 사용법 출력
     if len(sys.argv) != 2:
-        print("사용법: python predict.py <분석할_asm_파일_경로>")
+        print(json.dumps({"error": "Usage: python predict.py <path_to_asm_file>"}, indent=2))
     else:
+        # 두 번째 인자(분석할 파일 경로)를 가져옴
         asm_file_path = sys.argv[1]
+        # 메인 예측 함수를 호출
         predict_asm_file(asm_file_path)
