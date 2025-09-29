@@ -4,10 +4,10 @@ from pathlib import Path
 from extract_features import extract_features_from_path
 
 # === 경로 설정 ===
-BASE_DIR   = Path(__file__).resolve().parent.parent  # static/ 기준
+BASE_DIR   = Path(__file__).resolve().parent.parent  
 MODEL_PATH = BASE_DIR / "artifacts" / "static_model.pkl"
 YARA_PATH  = BASE_DIR / "rules" / "packer.yar"
-PE_PATH    = Path("/home/alstn/Zoom.exe")  # 로컬 테스트용 파일
+PE_PATH    = Path("/test/test.exe")  # 경로 수정 필요
 
 # --- 해시 함수 ---
 def file_hashes(file_path: Path):
