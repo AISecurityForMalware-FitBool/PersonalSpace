@@ -1,13 +1,16 @@
 import os, json, hashlib
 import joblib
+from pathlib import Path
 from extract_features import extract_features_from_path
 
-MODEL_PATH = "../artifacts/model.pkl"
-PE_PATH = "/home/alstn/Zoom.exe"      # 테스트용 파일
-YARA_PATH = "../rules/packer.yar"     # 실제 경로에 맞게 수정
+# === 경로 설정 ===
+BASE_DIR   = Path(__file__).resolve().parent.parent  # static/ 기준
+MODEL_PATH = BASE_DIR / "artifacts" / "static_model.pkl"
+YARA_PATH  = BASE_DIR / "rules" / "packer.yar"
+PE_PATH    = Path("/home/alstn/Zoom.exe")  # 로컬 테스트용 파일
 
 # --- 해시 함수 ---
-def file_hashes(file_path: str):
+def file_hashes(file_path: Path):
     h_md5 = hashlib.md5()
     h_sha256 = hashlib.sha256()
     with open(file_path, "rb") as f:
@@ -21,7 +24,7 @@ if __name__ == "__main__":
     model = joblib.load(MODEL_PATH)
 
     # 피처 추출
-    X_one = extract_features_from_path(PE_PATH, yara_rules_path=YARA_PATH)
+    X_one = extract_features_from_path(str(PE_PATH), yara_rules_path=str(YARA_PATH))
 
     # 예측
     prob = float(model.predict_proba(X_one)[0, 1])
@@ -32,53 +35,45 @@ if __name__ == "__main__":
 
     # 결과 JSON
     result = {
-        "file": PE_PATH,
+        "file": str(PE_PATH),
         "hashes": {
             "md5": md5,
             "sha256": sha256,
         },
         "prediction": {
-            "prob": prob*100,  # 0~100%
-            "label": label,  # 0=정상, 1=악성
+            "label": label,
+            "prob": prob,
+            "prob_percent": f"{prob*100:.2f}%",
         },
-        "features": X_one.to_dict(orient="records")[0],  # 필요 시 전체 피처도 포함
+        "features": X_one.to_dict(orient="records")[0],
     }
 
     print(json.dumps(result, indent=2, ensure_ascii=False))
-    
-    
-# AWS Lambda 핸들러 예시
+
+
+# === AWS Lambda 핸들러 ===
 def lambda_handler(event, context):
     model = joblib.load(MODEL_PATH)
 
-    # event에서 파일 경로 추출 (예: S3 이벤트)
-    file_path = event.get("file_path", PE_PATH)  # 기본값은 테스트용 파일
+    file_path = Path(event.get("file_path", PE_PATH))  # 기본값: 테스트용 파일
 
-    # 피처 추출
-    X_one = extract_features_from_path(file_path, yara_rules_path=YARA_PATH)
-
-    # 예측
-    prob = float(model.predict_proba(X_one)[0, 1])
+    X_one = extract_features_from_path(str(file_path), yara_rules_path=str(YARA_PATH))
+    prob  = float(model.predict_proba(X_one)[0, 1])
     label = int(prob >= 0.5)
-
-    # 해시 계산
     md5, sha256 = file_hashes(file_path)
 
-    # 결과 JSON
     result = {
-        "file": file_path,
+        "file": str(file_path),
         "hashes": {
             "md5": md5,
             "sha256": sha256,
         },
         "prediction": {
-            "prob": prob*100,
-            "label": label,  # 0=정상, 1=악성
+            "label": label,                     # 0=정상, 1=악성
+            "prob": prob,                       # 원래 확률값 (0~1)
+            "prob_percent": f"{prob*100:.2f}%", # 퍼센트 문자열 (예: "0.78%")
         },
-        "features": X_one.to_dict(orient="records")[0],  # 필요 시 전체 피처도 포함
+        "features": X_one.to_dict(orient="records")[0],
     }
 
-    return {
-        'statusCode': 200,
-        'body': json.dumps(result, ensure_ascii=False)
-    }
+    return {"statusCode": 200, "body": json.dumps(result, ensure_ascii=False)}
