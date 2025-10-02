@@ -2,12 +2,25 @@ import os, json, hashlib
 import joblib
 from pathlib import Path
 from extract_features import extract_features_from_path
+import pandas as pd
+import numpy as np 
+
+# --- 필수 함수 정의 ---
+def log_transform(X):
+    return np.log1p(np.clip(X, a_min=0, a_max=None))
+def remove_feature_prefixes(X):
+    """모델이 학습된 이름과 일치시킵니다."""
+    new_columns = [col.split('__')[-1] for col in X.columns]
+    X.columns = new_columns
+    return X
+
 
 # === 경로 설정 ===
-BASE_DIR   = Path(__file__).resolve().parent.parent  
-MODEL_PATH = BASE_DIR / "artifacts" / "static_model.pkl"
-YARA_PATH  = BASE_DIR / "rules" / "packer.yar"
-PE_PATH    = Path("/test/test.exe")  # 경로 수정 필요
+BASE_DIR      = Path(__file__).resolve().parent.parent
+PIPELINE_PATH = BASE_DIR / "artifacts" / "pipeline.pkl" 
+YARA_PATH     = BASE_DIR / "rules" / "packer.yar"
+PE_PATH       = Path("/home/alstn/SerialNumberDetectionTool.exe") // 샘플 PE 파일 경로
+
 
 # --- 해시 함수 ---
 def file_hashes(file_path: Path):
@@ -19,21 +32,26 @@ def file_hashes(file_path: Path):
             h_sha256.update(chunk)
     return h_md5.hexdigest(), h_sha256.hexdigest()
 
-# --- 메인 ---
+# --- 메인 (로컬 테스트) ---
 if __name__ == "__main__":
-    model = joblib.load(MODEL_PATH)
+    # 파이프라인 로드
+    pipeline = joblib.load(PIPELINE_PATH)
 
-    # 피처 추출
+    # 1. 피처 추출
     X_one = extract_features_from_path(str(PE_PATH), yara_rules_path=str(YARA_PATH))
-
-    # 예측
-    prob = float(model.predict_proba(X_one)[0, 1])
+    
+    # 2. 파이프라인에 원본 피처를 바로 전달
+    prob = float(pipeline.predict_proba(X_one)[0, 1])
     label = int(prob >= 0.5)
 
-    # 해시 계산
+    # 3. 전처리된 피처 추출 (결과 확인용)
+    X_one_processed = pipeline.named_steps['preprocessor'].transform(X_one)
+    X_one_processed = pipeline.named_steps['feature_cleaner'].transform(X_one_processed)
+    
+    # 4. 해시 계산
     md5, sha256 = file_hashes(PE_PATH)
 
-    # 결과 JSON
+    # 5. 결과 JSON
     result = {
         "file": str(PE_PATH),
         "hashes": {
@@ -45,7 +63,8 @@ if __name__ == "__main__":
             "prob": prob,
             "prob_percent": f"{prob*100:.2f}%",
         },
-        "features": X_one.to_dict(orient="records")[0],
+        "features_original": X_one.to_dict(orient="records")[0],
+        "features_processed": X_one_processed.to_dict(orient="records")[0],
     }
 
     print(json.dumps(result, indent=2, ensure_ascii=False))
@@ -53,15 +72,26 @@ if __name__ == "__main__":
 
 # === AWS Lambda 핸들러 ===
 def lambda_handler(event, context):
-    model = joblib.load(MODEL_PATH)
+    # 1. 파이프라인 로드 (모델 + 스케일러 포함)
+    pipeline = joblib.load(PIPELINE_PATH)
 
-    file_path = Path(event.get("file_path", PE_PATH))  # 기본값: 테스트용 파일
+    file_path = Path(event.get("file_path", PE_PATH))
 
+    # 2. 피처 추출 
     X_one = extract_features_from_path(str(file_path), yara_rules_path=str(YARA_PATH))
-    prob  = float(model.predict_proba(X_one)[0, 1])
+    
+    # 3. 파이프라인에 원본 피처를 전달
+    prob  = float(pipeline.predict_proba(X_one)[0, 1])
     label = int(prob >= 0.5)
+    
+    # 4. 전처리된 피처 추출 (결과 확인용)
+    X_one_processed = pipeline.named_steps['preprocessor'].transform(X_one)
+    X_one_processed = pipeline.named_steps['feature_cleaner'].transform(X_one_processed)
+
+    # 5. 해시 계산
     md5, sha256 = file_hashes(file_path)
 
+    # 6. 결과 JSON 구성
     result = {
         "file": str(file_path),
         "hashes": {
@@ -69,11 +99,11 @@ def lambda_handler(event, context):
             "sha256": sha256,
         },
         "prediction": {
-            "label": label,                     # 0=정상, 1=악성
-            "prob": prob,                       # 원래 확률값 (0~1)
-            "prob_percent": f"{prob*100:.2f}%", # 퍼센트 문자열 (예: "0.78%")
+            "label": label,
+            "prob": prob,
+            "prob_percent": f"{prob*100:.2f}%",
         },
-        "features": X_one.to_dict(orient="records")[0],
+        "features_original": X_one.to_dict(orient="records")[0],
     }
 
     return {"statusCode": 200, "body": json.dumps(result, ensure_ascii=False)}
