@@ -4,13 +4,8 @@ from pathlib import Path
 from extract_features import extract_features_from_path
 import pandas as pd
 import numpy as np 
-# 필요한 경우 sklearn 클래스도 임포트해야 합니다. (파이프라인이 내부적으로 사용하기 때문)
-# from sklearn.pipeline import Pipeline 
-# from sklearn.compose import ColumnTransformer 
-# from sklearn.preprocessing import StandardScaler, FunctionTransformer
 
 # --- 필수 함수 정의 ---
-# 파이프라인 로드 시 pickle이 이 정의를 필요로 합니다.
 def log_transform(X):
     return np.log1p(np.clip(X, a_min=0, a_max=None))
 def remove_feature_prefixes(X):
@@ -22,10 +17,9 @@ def remove_feature_prefixes(X):
 
 # === 경로 설정 ===
 BASE_DIR      = Path(__file__).resolve().parent.parent
-# ⬇️ 파이프라인 경로만 사용
 PIPELINE_PATH = BASE_DIR / "artifacts" / "pipeline.pkl" 
 YARA_PATH     = BASE_DIR / "rules" / "packer.yar"
-PE_PATH       = Path("/home/alstn/SerialNumberDetectionTool.exe") 
+PE_PATH       = Path("/home/alstn/SerialNumberDetectionTool.exe") // 샘플 PE 파일 경로
 
 
 # --- 해시 함수 ---
@@ -53,8 +47,6 @@ if __name__ == "__main__":
     # 3. 전처리된 피처 추출 (결과 확인용)
     X_one_processed = pipeline.named_steps['preprocessor'].transform(X_one)
     X_one_processed = pipeline.named_steps['feature_cleaner'].transform(X_one_processed)
-    
-    
     
     # 4. 해시 계산
     md5, sha256 = file_hashes(PE_PATH)
