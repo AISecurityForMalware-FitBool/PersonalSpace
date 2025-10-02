@@ -9,7 +9,7 @@
 ```text
 static/
 ├─ artifacts/                # 모델 및 피처 관련 산출물
-│  ├─ model.pkl              # 학습된 XGBoost 모델 (Pipeline 포함)
+│  ├─ pipeline.pkl           # 전처리 및 학습된 XGBoost 모델 파이프라인 
 │  └─ feature_list.txt       # 최종 피처 목록 (순서 고정)
 │
 ├─ src/
