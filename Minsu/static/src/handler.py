@@ -2,18 +2,9 @@ import os, json, hashlib
 import joblib
 from pathlib import Path
 from extract_features import extract_features_from_path
+from transformers import log_transform, remove_feature_prefixes
 import pandas as pd
 import numpy as np 
-
-# --- 필수 함수 정의 ---
-def log_transform(X):
-    return np.log1p(np.clip(X, a_min=0, a_max=None))
-def remove_feature_prefixes(X):
-    """모델이 학습된 이름과 일치시킵니다."""
-    new_columns = [col.split('__')[-1] for col in X.columns]
-    X.columns = new_columns
-    return X
-
 
 # === 경로 설정 ===
 BASE_DIR      = Path(__file__).resolve().parent.parent
