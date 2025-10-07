@@ -14,7 +14,6 @@ static/
 │
 ├─ src/
 │  ├─ extract_features.py    # PE 피처 추출 코드
-│  ├─ transformers.py        # 파이프라인 필요 함수 
 │  └─ handler.py             # 실행 및 AWS Lambda 핸들러
 │
 └─ rules/
