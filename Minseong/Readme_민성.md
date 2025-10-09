@@ -17,7 +17,6 @@ IMG/
 
 
 ## 실행 방법(로컬)
-'''bash
 ### 환경세팅
   pip install tensorflow opencv-python numpy
 
@@ -31,14 +30,11 @@ IMG/
 ### 결과 저장 위치
   ./PE_Inference_Assets/inference_results/
 
-'''
 
 
 
 ## 예측 결과 예시
-''' json
-
-
+json
 {
     "input_path": "/content/0b3731c524e6ba716f15087d85eae7e6225b6b51d4ae2fa6c142ff1523f57046.exe",
     "prediction": {
@@ -51,5 +47,5 @@ IMG/
         "model_path": "/content/final_model_all_data.keras"
     }
 }
-'''
+
 
