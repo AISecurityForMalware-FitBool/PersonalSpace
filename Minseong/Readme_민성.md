@@ -4,15 +4,16 @@
 ## 디렉토리 구조
 '''
 IMG/
-├─ PE_Inference_Assets/                 # <- LOCAL_ASSET_ROOT (스크립트가 자동 생성하는 자산 폴더)
-│  ├─ model/                            # <- MODEL_DIR (학습된 모델을 저장하는 폴더)
-│  │  └─ final_model_all_data.keras     # 사용자가 업로드한 최종 모델 파일
+├─ PE_Inference_Assets/                 # <- 스크립트가 자동 생성하는 자산 폴더
+│  ├─ model/                            # 학습된 EfficientNetV2-S 모델 저장
+│  │  └─ final_model_all_data.keras
 │  │
-│  └─ inference_results/                # <- INFERENCE_IMG_SAVE_DIR & INFERENCE_JSON_SAVE_DIR
-│     ├─ [PE파일명]_gray_300x300.png   # 변환된 PE 바이트 GrayScale 이미지
-│     └─ [PE파일명]_image_result.json  # 추론 결과(JSON 형식)
+│  └─ inference_results/                # 추론 결과 저장
+│     ├─ [PE파일명]_gray_300x300.png   # 변환된 PE GrayScale 이미지
+│     └─ [PE파일명]_image_result.json  # 추론 결과 (JSON)
 │
 └─ inference_workflow.py                # 단일 추론 워크플로우 스크립트
+
 
 '''
 
