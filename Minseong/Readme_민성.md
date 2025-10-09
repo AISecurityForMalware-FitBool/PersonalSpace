@@ -1,8 +1,8 @@
 # Malware Detection - IMG Analysis
 
-
 ## 디렉토리 구조
-'''
+
+```bash
 IMG/
 ├─ PE_Inference_Assets/                 # <- 스크립트가 자동 생성하는 자산 폴더
 │  ├─ model/                            # 학습된 EfficientNetV2-S 모델 저장
@@ -15,7 +15,6 @@ IMG/
 └─ inference_workflow.py                # 단일 추론 워크플로우 스크립트
 
 
-'''
 
 ## 실행 방법(로컬)
 '''bash
