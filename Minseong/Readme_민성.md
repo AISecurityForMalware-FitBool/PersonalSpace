@@ -1,12 +1,11 @@
-# 🧠 Malware Detection - IMG Analysis
+# Malware Detection - IMG Analysis
 
 EfficientNetV2-S 기반 악성코드 이미지 분석 파이프라인입니다.  
 PE(Portable Executable) 파일을 GrayScale 이미지로 변환하여 악성 여부를 추론합니다.
 
 ---
 
-## 📁 전체 워크플로우 구조 및 사용법
-
+## 디렉토리 구조
 ```bash
 IMG/
 ├─ PE_Inference_Assets/                 # <- 스크립트가 자동 생성하는 자산 폴더
@@ -19,34 +18,22 @@ IMG/
 │
 └─ inference_workflow.py                # 단일 추론 워크플로우 스크립트
 
+--------------------------------------------------------------------------
+## 환경 세팅
+    pip install tensorflow opencv-python numpy
 
-───────────────────────────────────────────────
-⚙️ [환경 세팅]
+# 실행
+    python inference_workflow.py
 
-pip install tensorflow opencv-python numpy
+# 입력 요청 시 경로 지정
+    1. 분석할 PE 파일 경로를 입력하세요 (예: C:/malware/sample.exe)
+    2. 모델 파일 경로를 입력하세요 (예: ./PE_Inference_Assets/model/final_model_all_data.keras)
 
+# 결과 저장 위치
+    ./PE_Inference_Assets/inference_results/
 
-───────────────────────────────────────────────
-🚀 [실행]
-
-python inference_workflow.py
-
-
-───────────────────────────────────────────────
-💬 [입력 요청 시 경로 지정]
-
-1. 분석할 PE 파일 경로를 입력하세요 (예: C:/malware/sample.exe)
-2. 모델 파일 경로를 입력하세요 (예: ./PE_Inference_Assets/model/final_model_all_data.keras)
-
-
-───────────────────────────────────────────────
-💾 [결과 저장 위치]
-
-./PE_Inference_Assets/inference_results/
-
-
-───────────────────────────────────────────────
-📊 [예측 결과 예시]
+--------------------------------------------------------------------------
+# 예측 결과 예시
 
 {
     "input_path": "/content/0b3731c524e6ba716f15087d85eae7e6225b6b51d4ae2fa6c142ff1523f57046.exe",
