@@ -11,7 +11,7 @@ IMG/
 ├─ artifacts/                 # <- 스크립트가 자동 생성하는 자산 폴더
 │  └─final_model_all_data.keras # 학습된 EfficientNetV2-S 모델 저장
 │    
-├─ src/                # 추론 결과 저장
+└─ src/                # 추론 결과 저장
    ├─ [PE파일명]_gray_300x300.png   # 변환된 PE GrayScale 이미지
    ├─ [PE파일명]_image_result.json  # 추론 결과 (JSON)
    └─ inference_workflow.py                # 단일 추론 워크플로우 스크립트
