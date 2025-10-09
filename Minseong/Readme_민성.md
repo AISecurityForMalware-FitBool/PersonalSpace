@@ -13,10 +13,7 @@ IMG/
 │     └─ [PE파일명]_image_result.json  # 추론 결과 (JSON)
 │
 └─ inference_workflow.py                # 단일 추론 워크플로우 스크립트
-'''
-'''bash
 
-'''
 
 # 실행 방법(로컬)
 # 환경세팅
